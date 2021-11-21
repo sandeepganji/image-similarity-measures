@@ -5,6 +5,7 @@ import os
 
 import cv2
 import numpy as np
+import nibabel as nib
 
 try:
     import rasterio
@@ -15,6 +16,25 @@ from image_similarity_measures.quality_metrics import metric_functions
 
 logger = logging.getLogger(__name__)
 
+def getListOfFiles(dirName, fileext):
+    # create a list of file and sub directories 
+    # names in the given directory 
+    listOfFile = os.listdir(dirName)
+    allFiles = list()
+    # Iterate over all the entries
+    for entry in listOfFile:        
+        # Create full path
+        fullPath = os.path.join(dirName, entry)
+        #print(fullPath)
+        
+        # If entry is a directory then get the list of files in this directory 
+        if os.path.isdir(fullPath):
+            allFiles = allFiles + getListOfFiles(fullPath)
+        else:
+            if fullPath[-len(fileext):] == fileext :
+                allFiles.append(fullPath)
+
+    return allFiles
 
 def read_image(path):
     logger.info("Reading image %s", os.path.basename(path))
@@ -22,6 +42,13 @@ def read_image(path):
         return np.rollaxis(rasterio.open(path).read(), 0, 3)
     return cv2.imread(path)
 
+def read_img_nifti(path):
+    logger.info("Reading image %s", os.path.basename(path))
+    if (path.endswith(".nii") or path.endswith(".nii.gz")):
+        img = nib.load(path)
+        #hdr = img.header
+        data = img.get_fdata()      
+    return data
 
 def evaluation(org_img_path, pred_img_path, metrics):
     output_dict = {}
@@ -35,6 +62,15 @@ def evaluation(org_img_path, pred_img_path, metrics):
         output_dict[metric] = out_value
     return output_dict
 
+def evaluation_data(org_img, pred_img, metrics):
+    output_dict = {}
+
+    for metric in metrics:
+        metric_func = metric_functions[metric]
+        out_value = float(metric_func(org_img, pred_img))
+        logger.info(f"{metric.upper()} value is: {out_value}")
+        output_dict[metric] = out_value
+    return output_dict
 
 def main():
     logging.basicConfig(
